@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Lume · A Última Vigília</title>
+
+<style>
+*{box-sizing:border-box}
+html,body{
+ margin:0;width:100%;height:100%;background:#08151d;
+ color:#efe6cc;font:15px system-ui,sans-serif;overflow:hidden
+}
+button{
+ font:600 13px system-ui;color:#f5e9cb;background:#203d43;
+ border:1px solid #668581;border-radius:12px;min-height:48px;
+ padding:10px 15px;touch-action:none;
+ -webkit-tap-highlight-color:transparent
+}
+button:active,.pressed{background:#657d6d;transform:translateY(1px)}
+button:disabled{opacity:.35}
+[hidden]{display:none!important}
+#app{height:100dvh;height:100svh;display:flex;flex-direction:column}
+#view{position:relative;flex:1;min-height:0;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{
+ position:absolute;top:max(8px,env(safe-area-inset-top));
+ left:max(12px,env(safe-area-inset-left));
+ right:max(12px,env(safe-area-inset-right));
+ display:flex;align-items:flex-start;gap:10px;pointer-events:none
+}
+#hud button{pointer-events:auto;min-height:42px;padding:8px}
+#health{
+ color:#f2ce8e;font-size:19px;letter-spacing:2px;
+ text-shadow:0 2px 8px #000
+}
+#stats{font-size:11px;color:#c5d4cb;text-shadow:0 2px 6px #000}
+.space{flex:1}
+#bossbar{
+ position:absolute;top:71px;left:20%;right:20%;text-align:center
+}
+#bossname{font-size:10px;letter-spacing:1px;text-shadow:0 1px 5px #000}
+#bosstrack{
+ height:6px;background:#08161d;
+ border:1px solid #978667;margin-top:5px
+}
+#bossfill{height:100%;background:#e0b17a}
+#controls{
+ display:flex;justify-content:space-between;align-items:center;gap:8px;
+ padding:8px max(12px,env(safe-area-inset-right))
+ max(9px,env(safe-area-inset-bottom));
+ background:#0b2028;user-select:none
+}
+.cluster{display:flex;gap:8px;align-items:center}
+.move{width:58px;height:58px;font-size:26px;padding:4px}
+#jump,#attack{height:62px;width:71px;padding:3px}
+#attack{background:#806044;border-color:#d4ad6b}
+#dash{height:51px;width:63px;padding:3px;font-size:11px}
+#use{
+ position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+ background:#254d50;max-width:90%;white-space:nowrap
+}
+#toast{
+ position:absolute;bottom:73px;left:50%;transform:translateX(-50%);
+ padding:8px 14px;background:#102831e8;border:1px solid #4e6963;
+ border-radius:10px;max-width:92%;width:max-content;text-align:center;
+ font-size:12px;pointer-events:none;transition:opacity .2s
+}
+#panel{
+ position:fixed;inset:0;z-index:5;display:grid;place-items:center;
+ background:#030d14a8;padding:12px;backdrop-filter:blur(4px)
+}
+.card{
+ width:min(590px,100%);max-height:94dvh;overflow:auto;
+ border:1px solid #708575;border-radius:18px;
+ background:linear-gradient(145deg,#1a343d,#0b1e2a);
+ padding:clamp(18px,4vw,30px);box-shadow:0 24px 90px #0008
+}
+.mark{font-size:10px;letter-spacing:3px;color:#c5b082}
+.card h1{
+ font:clamp(24px,5vw,38px) Georgia;
+ margin:12px 0 18px;color:#f3dcad
+}
+#body{
+ font-size:15px;line-height:1.6;white-space:pre-line;color:#d2dfd9
+}
+#options{display:grid;gap:9px;margin-top:20px}
+#options button:first-child{background:#947044;border-color:#d2b984}
+@media(max-width:400px){
+ .move{width:48px}
+ .cluster{gap:5px}
+ #jump,#attack{width:63px}
+ #dash{width:55px}
+ #controls{padding-left:8px;padding-right:8px}
+ #full{display:none}
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+ <div id="view">
+  <canvas id="game" aria-label="Jogo de ação Lume"></canvas>
+
+  <div id="hud">
+   <div>
+    <div id="health"></div>
+    <div id="stats">LUME · A Última Vigília</div>
+   </div>
+   <div class="space"></div>
+   <button id="heal" data-key="heal">Curar</button>
+   <button id="full" aria-label="Tela cheia">⛶</button>
+   <button id="pause">Pausa</button>
+  </div>
+
+  <div id="bossbar" hidden>
+   <div id="bossname"></div>
+   <div id="bosstrack"><div id="bossfill"></div></div>
+  </div>
+
+  <button id="use" data-key="use" hidden>Conversar</button>
+  <div id="toast"></div>
+ </div>
+
+ <div id="controls">
+  <div class="cluster">
+   <button class="move" data-key="left"
+    aria-label="Andar para esquerda">◀</button>
+   <button class="move" data-key="right"
+    aria-label="Andar para direita">▶</button>
+  </div>
+  <div class="cluster">
+   <button id="dash" data-key="dash">Esquiva</button>
+   <button id="jump" data-key="jump">Pular</button>
+   <button id="attack" data-key="attack">Golpear</button>
+  </div>
+ </div>
+</div>
+
+<div id="panel">
+ <div class="card">
+  <div class="mark">LUME · CAPÍTULO I</div>
+  <h1 id="title"></h1>
+  <div id="body"></div>
+  <div id="options"></div>
+ </div>
+</div>
+
+<script>
+'use strict';
+
+const $=id=>document.getElementById(id);
+const c=$('game'),g=c.getContext('2d');
+
+const W=1200,F=440,GR=1500,SAVE='lume-v1';
+
+const names=[
+ 'Abrigo das Cinzas',
+ 'Comporta Partida',
+ 'Jardim das Vozes',
+ 'Galeria Suspensa',
+ 'Coração do Aqueduto'
+];
+
+const fresh=()=>({
+ room:0,
+ coins:0,
+ life:6,
+ power:1,
+ dash:false,
+ double:false,
+ flask:false,
+ seed:false,
+ trinca:false,
+ glass:false,
+ final:false,
+ end:'',
+ book:[]
+});
+
+let data=fresh(),stored=false;
+
+try{
+ const v=JSON.parse(localStorage.getItem(SAVE));
+ if(v&&v.v===1){
+  data={...fresh(),...v.data};
+  stored=true;
+ }
+}catch(e){}
+
+let mode='title',room=0,p;
+let enemies=[],shots=[],sparks=[],plats=[],npcs=[],target=null;
+let t=0,acc=0,last=0,camera=0,view=960,scale=1;
+let shake=0,serial=0,boss=null,toastTime=0;
+
+const held=new Set(),touch=new Map(),keys=new Set();
+
+const mapKeys={
+ ArrowLeft:'left',a:'left',A:'left',
+ ArrowRight:'right',d:'right',D:'right',
+ ' ':'jump',w:'jump',ArrowUp:'jump',
+ j:'attack',J:'attack',
+ k:'dash',K:'dash',
+ e:'use',E:'use',
+ h:'heal',H:'heal'
+};
+
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+
+function save(){
+ try{
+  localStorage.setItem(SAVE,JSON.stringify({v:1,data}));
+  stored=true;
+ }catch(e){
+  stored=false;
+ }
+}
+
+function note(id,line){
+ if(!data.book.some(x=>x.id===id)){
+  data.book.push({id,line});
+ }
+ save();
+}
+
+function toast(s){
+ $('toast').textContent=s;
+ toastTime=4;
+}
+
+function resetInput(){
+ held.clear();
+ touch.clear();
+ keys.clear();
+
+ document.querySelectorAll('[data-key]').forEach(b=>{
+  b.classList.remove('pressed');
+ });
+}
+
+function panel(title,body,actions){
+ mode='menu';
+ resetInput();
+
+ $('title').textContent=title;
+ $('body').textContent=body;
+ $('options').replaceChildren();
+
+ actions.forEach(([label,fn])=>{
+  const b=document.createElement('button');
+  b.textContent=label;
+  b.onclick=fn;
+  $('options').appendChild(b);
+ });
+
+ $('panel').hidden=false;
+}
+
+function resume(){
+ mode='play';
+ $('panel').hidden=true;
+ resetInput();
+}
+
+function start(restart=false){
+ if(restart)data=fresh();
+ enter(data.room);
+ resume();
+}
+
+function intro(){
+ panel(
+  'LUME · A Última Vigília',
+  'O aqueduto de Alva queimava lembranças para manter a cidade acesa. Quando o combustível acabou, Aster pôs todos para dormir.\n\nVocê é Nima, guardiã de uma lanterna vazia. Desça até o coração da máquina e descubra quem ainda está sonhando.\n\nUma fase, cinco salas conectadas. Converse com os habitantes: eles ensinam as habilidades necessárias. Melhor jogar na horizontal.',
+  [
+   [stored?'Continuar jornada':'Acender a lanterna',()=>start()],
+   ['Controles',help]
+  ]
+ );
+ mode='title';
+}
+
+function help(){
+ panel(
+  'Como jogar',
+  '◀ ▶ : caminhar\nPULAR: salto; segure para subir mais.\nGOLPEAR: ataque na direção em que você olha; pode segurar.\nESQUIVA: avanço com proteção breve, depois de aprender com Ema.\nCONVERSAR / ENTRAR: aparece perto de pessoas e passagens.\nCURAR: recupera 2 pontos, depois de receber o frasco.\n\nTeclado: A/D ou setas, espaço, J, K, E, H. Esc pausa.\n\nAs lanternas e a entrada de cada sala recuperam vida e frascos. Ao morrer você volta à entrada e mantém habilidades e itens.\n\nAtaques dos chefes têm um aviso dourado. Desvie e ataque durante a recuperação.',
+  [['Voltar',()=>p?pause():intro()]]
+ );
+}
+
+function objective(){
+ if(data.final){
+  return 'O coração está em silêncio. Escolha o destino das memórias.';
+ }
+ if(!data.dash){
+  return 'Fale com Ema no Abrigo e aprenda a esquiva.';
+ }
+ if(!data.trinca){
+  return 'Derrote Trinca na Comporta Partida.';
+ }
+ if(!data.flask){
+  return 'Encontre Íria no Jardim e receba o frasco.';
+ }
+ if(!data.glass){
+  return 'Derrote o Vigia de Vidro na Galeria Suspensa.';
+ }
+ if(!data.double){
+  return 'Leve a Semente de Eco a Sava, no Jardim.';
+ }
+
+ return 'Use o salto duplo para alcançar a saída alta da Galeria. Enfrente Aster.';
+}
+
+function pause(){
+ if(mode==='title')return;
+
+ const bag=[
+  'Esquiva: '+(data.dash?'aprendida':'Ema ensina'),
+  'Salto duplo: '+(
+   data.double?'aprendido':
+   data.seed?'leve a semente a Sava':'encontre a semente'
+  ),
+  'Frasco: '+(data.flask?'recebido':'Íria oferece'),
+  'Lâmina: nível '+data.power,
+  'Vigor: '+data.life,
+  'Lúmens: '+data.coins
+ ];
+
+ const caminho=names.map((n,i)=>{
+  return (i===room?'→ ':'· ')+n;
+ }).join('\n');
+
+ const memorias=data.book.map(x=>{
+  return '• '+x.line;
+ }).join('\n\n')||'Converse com os habitantes para registrar a história.';
+
+ const armazenamento=stored?
+  'Progresso salvo neste navegador.':
+  'O navegador não disponibilizou armazenamento; o progresso dura somente nesta sessão.';
+
+ panel(
+  'Pausa · Diário',
+  objective()+
+  '\n\n'+bag.join('\n')+
+  '\n\nCAMINHO\n'+caminho+
+  '\n\nMEMÓRIAS\n'+memorias+
+  '\n\n'+armazenamento,
+  [
+   ['Voltar ao jogo',resume],
+   ['Controles',help],
+   ['Recomeçar',()=>{
+    panel(
+     'Apagar esta jornada?',
+     'Isso apaga o progresso salvo deste jogo.',
+     [
+      ['Cancelar',pause],
+      ['Começar de novo',()=>start(true)]
+     ]
+    );
+   }]
+  ]
+ );
+}
+
+function particle(x,y,color,n=12){
+ for(let i=0;i<n;i++){
+  sparks.push({
+   x,y,
+   vx:(Math.random()-.5)*210,
+   vy:(Math.random()-.7)*210,
+   life:.3+Math.random()*.5,
+   color
+  });
+ }
+}
+
+function foe(type,x){
+ const hp={
+  mote:2,
+  trinca:10,
+  glass:12,
+  aster:24
+ }[type];
+
+ return {
+  type,
+  x,
+  y:F,
+  w:type==='aster'?68:type==='mote'?30:52,
+  h:type==='aster'?104:type==='mote'?28:66,
+  hp,
+  max:hp,
+  dir:-1,
+  state:'rest',
+  time:1.2,
+  flash:0,
+  hit:0,
+  active:type==='mote',
+  cycle:0
+ };
+}
+
+function enter(r,back=false){
+ room=r;
+ data.room=r;
+ save();
+
+ shots=[];
+ sparks=[];
+ boss=null;
+ enemies=[];
+ plats=[];
+ npcs=[];
+ target=null;
+
+ p={
+  x:back?1100:100,
+  y:F,
+  vx:0,
+  vy:0,
+  hp:data.life,
+  pots:data.flask?2:0,
+  dir:back?-1:1,
+  ground:true,
+  jumps:0,
+  coyote:.1,
+  buffer:0,
+  inv:1,
+  dash:0,
+  dashcd:0,
+  attack:0,
+  atkcd:0,
+  hit:0
+ };
+
+ if(r===0){
+  npcs=[
+   {id:'oru',x:340,y:F,name:'Oru'},
+   {id:'ema',x:780,y:F,name:'Ema'}
+  ];
+ }
+
+ if(r===1){
+  enemies=[
+   foe('mote',270),
+   foe('mote',410)
+  ];
+
+  if(!data.trinca){
+   enemies.push(foe('trinca',850));
+  }
+ }
+
+ if(r===2){
+  npcs=[
+   {id:'iria',x:230,y:F,name:'Íria'},
+   {id:'sava',x:630,y:F,name:'Sava'}
+  ];
+
+  enemies=[foe('mote',980)];
+ }
+
+ if(r===3){
+  if(!data.glass){
+   enemies.push(foe('glass',790));
+  }
+
+  plats=[
+   {x:905,y:330,w:120},
+   {x:1060,y:160,w:140}
+  ];
+
+  if(back){
+   p.x=1140;
+   p.y=160;
+  }
+ }
+
+ if(r===4&&!data.final){
+  enemies=[foe('aster',850)];
+ }
+
+ camera=clamp(p.x-view*.4,0,Math.max(0,W-view));
+ toast(names[r]+' · Vida e frascos recuperados');
+ resetInput();
+}
+
+function talk(id){
+ if(id==='oru'){
+  note(
+   'alva',
+   'Alva trocava lembranças por luz. Oru entregou o rosto da filha e esqueceu por quem trabalhava.'
+  );
+
+  panel(
+   'Oru · O arquivista',
+   'Eu copiava os nomes antes de serem queimados. Hoje reconheço minha letra, mas não reconheço as pessoas.\n\nAster não criou a fome da cidade. Ele só fechou os olhos de quem a sentia.\n\nProcure Ema, à direita. Nenhuma lanterna atravessa estas ruínas sem aprender a fugir.',
+   [['Continuar',resume]]
+  );
+ }
+
+ if(id==='ema'){
+  note(
+   'ema',
+   'Ema construiu as comportas. O primeiro tremor veio de dentro: a máquina se alimentava de quem a mantinha.'
+  );
+
+  const actions=[];
+
+  if(!data.dash){
+   actions.push([
+    'Aprender esquiva · grátis',
+    ()=>{
+     data.dash=true;
+     save();
+     resume();
+     toast('ESQUIVA liberada · K ou botão. Atravesse ataques com proteção breve.');
+    }
+   ]);
+  }
+
+  if(data.power===1){
+   actions.push([
+    'Afiar lâmina · 10 lúmens',
+    ()=>{
+     if(data.coins<10){
+      toast('Faltam '+(10-data.coins)+' lúmens.');
+      return;
+     }
+
+     data.coins-=10;
+     data.power=2;
+     save();
+     talk('ema');
+    }
+   ]);
+  }
+
+  actions.push(['Sair',resume]);
+
+  panel(
+   'Ema · A mecânica',
+   'Trinca ainda guarda a comporta. Quando sua carapaça brilhar, ele vai correr. Pule ou use a esquiva. Ataque quando ele parar.\n\n'+
+   (
+    data.dash?
+    'Você já aprendeu a esquiva.':
+    'Posso ensinar a esquiva sem cobrar nada.'
+   )+
+   '\n\nAfiar sua lâmina aumenta cada golpe de 1 para 2 de dano. Lúmens atuais: '+data.coins+'.',
+   actions
+  );
+ }
+
+ if(id==='iria'){
+  note(
+   'iria',
+   'Íria foi a única a recusar o sono. Seu frasco carrega água do aqueduto, ainda capaz de devolver calor às lanternas.'
+  );
+
+  const actions=[];
+
+  if(!data.flask){
+   actions.push([
+    'Receber frasco · grátis',
+    ()=>{
+     data.flask=true;
+     p.pots=2;
+     save();
+     resume();
+     toast('FRASCO recebido · Toque em CURAR. Duas cargas por sala.');
+    }
+   ]);
+  }
+
+  if(data.life<10){
+   actions.push([
+    'Aumentar vigor em 2 · 8 lúmens',
+    ()=>{
+     if(data.coins<8){
+      toast('Faltam '+(8-data.coins)+' lúmens.');
+      return;
+     }
+
+     data.coins-=8;
+     data.life+=2;
+     p.hp=data.life;
+     save();
+     talk('iria');
+    }
+   ]);
+  }
+
+  actions.push(['Sair',resume]);
+
+  panel(
+   'Íria · A cuidadora',
+   'Dormir evitou a dor, mas também impediu a mudança. Guardo água para quem ainda decide caminhar.\n\nMeu frasco cura 2 pontos e recarrega nas lanternas e nas entradas das salas. Posso fortalecer sua lanterna até 10 pontos de vigor.\n\nLúmens atuais: '+data.coins+'.',
+   actions
+  );
+ }
+
+ if(id==='sava'){
+  note(
+   'sava',
+   'Sava guardou uma semente com a voz de sua irmã. O Vigia a levou para que nenhuma lembrança escapasse.'
+  );
+
+  const actions=[];
+
+  if(data.seed&&!data.double){
+   actions.push([
+    'Aprender salto duplo',
+    ()=>{
+     data.double=true;
+     save();
+     resume();
+     toast('SALTO DUPLO liberado · Toque em PULAR mais uma vez no ar.');
+    }
+   ]);
+  }
+
+  actions.push(['Sair',resume]);
+
+  const texto=data.double?
+   'A semente ouviu você. Volte à Galeria: a passagem para Aster fica acima das duas plataformas, à direita.':
+   data.seed?
+   'Você trouxe a semente. Ela lembra como subir quando os pés já perderam o chão.\n\nDeixe-me devolver essa lembrança à sua lanterna.':
+   'O Vigia de Vidro roubou minha Semente de Eco. Ele está na próxima sala.\n\nTraga a semente e eu ensinarei um segundo salto no ar. Você precisará dele para alcançar a câmara de Aster.';
+
+  panel('Sava · A jardineira',texto,actions);
+ }
+}
+
+function ending(){
+ panel(
+  'Aster · O último guardião',
+  'Eu mantive seus nomes dentro da máquina. Sem o sono, eles acordarão com tudo o que perderam.\n\nNima abre a lanterna. As vozes esperam por uma decisão.',
+  [
+   ['Devolver as memórias',()=>finish('amanhecer')],
+   ['Preservar o sono',()=>finish('vigilia')]
+  ]
+ );
+}
+
+function finish(choice){
+ data.end=choice;
+ save();
+
+ const s=choice==='amanhecer'?
+  'As luzes se apagam uma por uma. Pela primeira vez, Alva vê as estrelas. Oru lembra o rosto da filha e chora. Nima divide a última chama: a cidade terá de aprender a viver sem queimar quem ama.':
+  'Aster entrega a chave a Nima. Ela mantém o aqueduto aceso, mas grava cada nome nas paredes. Um dia haverá luz suficiente para abrir os olhos de todos. Até lá, ela não dormirá.';
+
+ note('fim-'+choice,s);
+
+ panel(
+  choice==='amanhecer'?
+   'Final · Um amanhecer sem luz':
+   'Final · Uma vigília com nomes',
+  s+'\n\nFASE CONCLUÍDA\nDois minibosses e Aster derrotados. Você pode voltar para conversar e completar o diário.',
+  [
+   ['Explorar novamente',resume],
+   ['Ver diário',pause]
+  ]
+ );
+}
+
+function nearest(){
+ if(boss&&boss.hp>0)return null;
+
+ const candidates=npcs.map(n=>({
+  ...n,
+  kind:'npc',
+  label:'Conversar · '+n.name
+ }));
+
+ candidates.push({
+  x:130,
+  y:F,
+  kind:'rest',
+  label:'Reacender lanterna'
+ });
+
+ if(room>0){
+  candidates.push({
+   x:40,
+   y:F,
+   kind:'left',
+   label:'Voltar'
+  });
+ }
+
+ if(room<4){
+  candidates.push({
+   x:1160,
+   y:room===3?160:F,
+   kind:'right',
+   label:'Entrar'
+  });
+ }
+
+ if(room===4&&data.final){
+  candidates.push({
+   x:840,
+   y:F,
+   kind:'end',
+   label:'Ouvir as memórias'
+  });
+ }
+
+ return candidates.filter(n=>{
+  return Math.abs(p.x-n.x)<86&&Math.abs(p.y-n.y)<75;
+ }).sort((a,b)=>{
+  return Math.abs(p.x-a.x)-Math.abs(p.x-b.x);
+ })[0]||null;
+}
+
+function interact(){
+ target=nearest();
+ if(!target)return;
+
+ const k=target.kind;
+
+ if(k==='npc'){
+  return talk(target.id);
+ }
+
+ if(k==='rest'){
+  p.hp=data.life;
+  p.pots=data.flask?2:0;
+  save();
+  return toast('Lanterna reacendida · progresso salvo');
+ }
+
+ if(k==='left'){
+  return enter(room-1,true);
+ }
+
+ if(k==='end'){
+  return ending();
+ }
+
+ if(k==='right'){
+  if(room===0&&!data.dash){
+   return toast('Fale com Ema antes de sair: ela ensina a esquiva.');
+  }
+
+  if(room===1&&!data.trinca){
+   return toast('Trinca guarda esta passagem.');
+  }
+
+  if(room===3&&(!data.glass||!data.double)){
+   return toast('Leve a Semente de Eco a Sava para aprender o salto duplo.');
+  }
+
+  enter(room+1);
+ }
+}
+
+function press(k){
+ if(mode!=='play')return;
+
+ held.add(k);
+
+ if(k==='jump'){
+  p.buffer=.13;
+ }
+
+ if(k==='use'){
+  interact();
+ }
+
+ if(k==='heal'){
+  if(!data.flask){
+   return toast('Íria tem um frasco para você no Jardim.');
+  }
+
+  if(p.hp>=data.life){
+   return toast('Sua lanterna já está cheia.');
+  }
+
+  if(p.pots>0){
+   p.pots--;
+   p.hp=Math.min(data.life,p.hp+2);
+   particle(p.x,p.y-25,'#89efca',22);
+  }else{
+   toast('Recarregue o frasco em uma lanterna ou na entrada da próxima sala.');
+  }
+ }
+
+ if(k==='dash'&&data.dash&&p.dashcd<=0){
+  p.dash=.23;
+  p.dashcd=.85;
+  p.inv=Math.max(p.inv,.26);
+  p.vy=0;
+  particle(p.x,p.y-20,'#9de7e7');
+ }
+}
+
+function hurt(from){
+ if(p.inv>0||mode!=='play')return;
+
+ p.hp--;
+ p.inv=1.2;
+ p.vx=Math.sign(p.x-from||1)*220;
+ p.vy=-180;
+
+ shake=7;
+ particle(p.x,p.y-25,'#f29377');
+
+ if(p.hp<=0){
+  save();
+
+  panel(
+   'A chama vacilou',
+   'Você mantém seus lúmens, habilidades e vitórias. Os inimigos desta sala voltam à posição inicial.',
+   [
+    ['Reacender na entrada',()=>{
+     enter(room);
+     resume();
+    }]
+   ]
+  );
+ }
+}
+
+function strike(){
+ if(p.atkcd>0)return;
+
+ p.atkcd=.34;
+ p.attack=.17;
+ p.hit=++serial;
+}
+
+function damageEnemy(e){
+ e.hit=p.hit;
+ e.hp-=data.power;
+ e.flash=.15;
+
+ particle(e.x,e.y-e.h/2,'#fff1b7',8);
+
+ if(e.type==='mote'){
+  e.x+=p.dir*24;
+ }
+
+ if(e.hp>0)return;
+
+ data.coins+=e.type==='mote'?2:e.type==='aster'?24:14;
+ particle(e.x,e.y-e.h/2,'#f7cb75',28);
+
+ if(e.type==='trinca'){
+  data.trinca=true;
+
+  note(
+   'trinca',
+   'Trinca não defendia um tesouro. Defendia a última ordem que ainda lembrava.'
+  );
+
+  toast('TRINCA DERROTADO · Comporta aberta · +14 lúmens');
+ }
+
+ if(e.type==='glass'){
+  data.glass=true;
+  data.seed=true;
+
+  note(
+   'vidro',
+   'Dentro do Vigia havia uma semente intacta. Até uma prisão pode proteger aquilo que roubou.'
+  );
+
+  toast('SEMENTE DE ECO recuperada · Volte a Sava no Jardim.');
+ }
+
+ if(e.type==='aster'){
+  data.final=true;
+
+  note(
+   'aster',
+   'Aster escolheu o sono para impedir que Alva queimasse suas últimas lembranças.'
+  );
+
+  toast('ASTER DERROTADO · Aproxime-se do coração e escolha o final.');
+ }
+
+ if(e.type!=='mote'){
+  boss=null;
+  shots=[];
+  p.hp=data.life;
+  p.pots=data.flask?2:0;
+ }
+
+ save();
+}
+
+function projectile(e,kind,vx,vy=0){
+ shots.push({
+  x:e.x,
+  y:kind==='wave'?F-14:e.y-50,
+  vx,
+  vy,
+  kind,
+  life:5,
+  r:kind==='wave'?14:9
+ });
+}
+
+function updateEnemy(e,dt){
+ if(e.hp<=0)return;
+
+ e.flash=Math.max(0,e.flash-dt);
+
+ if(e.type==='mote'){
+  e.x+=Math.sign(p.x-e.x)*50*dt;
+  e.x=clamp(e.x,180,1050);
+
+ }else
